@@ -1,0 +1,43 @@
+version: '3'
+services:
+  django:
+    image: django-shiroe:dev
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    environment:
+      - DJANGO_SECRET_KEY="123456"
+      - DJANGO_SETTINGS_MODULE=django_shiroe.settings
+      - DJANGO_DATABASE=postgres
+      - DJANGO_DATABASE_ENGINE=django.db.backends.postgresql
+      - DJANGO_DATABASE_HOST=db
+      - DJANGO_DATABASE_NAME=postgres
+      - DJANGO_DATABASE_USER=postgres
+      - DJANGO_DATABASE_PASSWORD=p_password
+      - DJANGO_DATABASE_PORT=5432
+      - COVERALLS_REPO_TOKEN=${COVERALLS_REPO_TOKEN}
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./:/home/django/django_shiroe/
+      - django-static:/home/django/django_shiroe/static
+      - django-media:/home/django/django_shiroe/media
+    links:
+      - db:db
+    depends_on:
+      - db
+  db:
+    restart: always
+    image: postgres:10-alpine
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgresdata:/var/lib/postgresql/data/
+    environment:
+      - POSTGRES_DB=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=p_password
+volumes:
+  postgresdata:
+  django-static:
+  django-media:

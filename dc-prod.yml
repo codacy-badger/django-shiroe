@@ -1,0 +1,37 @@
+version: '3'
+services:
+  django:
+    image: django-shiroe
+    restart: always
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    environment:
+      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
+      - DJANGO_SETTINGS_MODULE=${DJANGO_SETTINGS_MODULE}
+      - DJANGO_DATABASE=${DJANGO_DATABASE}
+      - DJANGO_DATABASE_ENGINE=${DJANGO_DATABASE_ENGINE}
+      - DJANGO_DATABASE_HOST=${DJANGO_DATABASE_HOST}
+      - DJANGO_DATABASE_NAME=${DJANGO_DATABASE_NAME}
+      - DJANGO_DATABASE_USER=${DJANGO_DATABASE_USER}
+      - DJANGO_DATABASE_PASSWORD=${DJANGO_DATABASE_PASSWORD}
+      - DJANGO_DATABASE_PORT=${DJANGO_DATABASE_PORT}
+    expose:
+      - "8000"
+    ports:
+      - "8000:8000"
+    entrypoint: ./docker/commands/startup-prod.sh
+  nginx:
+    restart: always
+    build: docker/nginx
+    ports:
+      - "80:80"
+    volumes:
+      - django-static:/home/django/django_recipe/static
+      - django-media:/home/django/django_recipe/media
+    links:
+      - django:django
+
+volumes:
+  django-static:
+  django-media:
