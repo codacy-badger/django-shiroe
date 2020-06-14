@@ -175,7 +175,10 @@ class PostTestCase(TestCase):
         self.assertEqual(post.created_at, post.modified_at)
 
     def test_post_creation_success_no_cover_image(self) -> None:
-        """ Test post can be created when valid details are supplied but no cover_image """
+        """
+        Test post can be created when valid details
+        are supplied but no cover_image
+        """
         title = content = uuid.uuid4()
         post = models.Post.objects.create(
             title=title, content=content, category=self.category, author=self.author

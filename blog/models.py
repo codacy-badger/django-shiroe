@@ -92,13 +92,23 @@ class SocialAccount(models.Model):
 
 
 class Post(models.Model):
-    author = models.ForeignKey("blog.Author", null=True, on_delete=models.SET_NULL, blank=True)
+    author = models.ForeignKey(
+        "blog.Author",
+        null=True,
+        on_delete=models.SET_NULL,
+        blank=True
+    )
     cover_image = models.ImageField(null=True, upload_to=post_image_file_path, blank=True)
     title = models.CharField(max_length=255)
     slug = models.SlugField(max_length=255, unique=True, blank=True)
     content = models.TextField()
     summary = models.TextField(max_length=500, blank=True)
-    category = models.ForeignKey("blog.Category", null=True, on_delete=models.SET_NULL, blank=True)
+    category = models.ForeignKey(
+        "blog.Category",
+        null=True,
+        on_delete=models.SET_NULL,
+        blank=True
+    )
     tags = models.ManyToManyField("blog.Tag", related_name="tags", blank=True)
     DRAFT = "Draft"
     PUBLISHED = "Published"
