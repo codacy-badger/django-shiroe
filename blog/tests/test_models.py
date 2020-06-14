@@ -1,6 +1,7 @@
 import tempfile
 import uuid
 
+from PIL import Image
 from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.contrib.auth import get_user_model
@@ -11,13 +12,14 @@ from .. import models
 
 class AuthorTestCase(TestCase):
     """ Testing the Author Model"""
-    def __init__(self) -> None:
-        super(AuthorTestCase, self).__init__()
-        self.first_name = "Test"
-        self.last_name = "User"
 
     def setUp(self) -> None:
-        self.user = get_user_model().objects.create_user(email=self.email)
+        self.first_name = "Test"
+        self.last_name = "User"
+        self.email = "test@example.com"
+        user_data = {f"{get_user_model().USERNAME_FIELD}": self.email}
+        self.user = get_user_model().objects.create_user(**user_data)
+        self.mock_image = self.get_mock_image()
 
     def tearDown(self) -> None:
         self.user.delete()
@@ -25,14 +27,15 @@ class AuthorTestCase(TestCase):
     @staticmethod
     def get_mock_image():
         from django.core.files.images import ImageFile
-        file = tempfile.NamedTemporaryFile(suffix='.png')
+
+        file = tempfile.NamedTemporaryFile(suffix=".png")
         return ImageFile(file, name=file.name)
 
     def test_author_creation_success(self) -> None:
         """ Test author can be created with valid details"""
         author = models.Author.objects.create(
             user=self.user,
-            avatar=self.get_mock_image(),
+            avatar=self.mock_image,
             first_name=self.first_name,
             last_name=self.last_name,
         )
@@ -44,9 +47,9 @@ class AuthorTestCase(TestCase):
 
     def test_author_creation_fail_no_user(self) -> None:
         """ Test author creation fails if no user obj is provided """
-        with self.assertRaises(ValidationError):
+        with self.assertRaises(get_user_model().DoesNotExist):
             models.Author.objects.create(
-                avatar=self.get_mock_image(),
+                avatar=self.mock_image,
                 first_name=self.first_name,
                 last_name=self.last_name,
             )
@@ -55,38 +58,35 @@ class AuthorTestCase(TestCase):
         """ Test author creation fails if no first_name is provided """
         with self.assertRaises(ValidationError):
             models.Author.objects.create(
-                avatar=self.get_mock_image(),
-                last_name=self.last_name,
+                user=self.user, avatar=self.mock_image, last_name=self.last_name,
             )
 
     def test_author_creation_fail_no_last_name(self) -> None:
         """ Test author creation fails if no last_name is provided """
         with self.assertRaises(ValidationError):
             models.Author.objects.create(
-                avatar=self.get_mock_image(),
-                first_name=self.first_name,
+                user=self.user, avatar=self.mock_image, first_name=self.first_name,
             )
 
-    def test_author_creation_fail_no_invalid_name(self) -> None:
-        """ Test author creation fails if no invalid_name is provided """
+    def test_author_creation_fail_invalid_name(self) -> None:
+        """ Test author creation fails if invalid_name is provided """
         with self.assertRaises(ValidationError):
             models.Author.objects.create(
-                avatar=self.get_mock_image(),
+                user=self.user,
+                avatar=self.mock_image,
                 first_name="1234567",
-                last_name="1234567"
+                last_name="1234567",
             )
 
 
 class PostTestCase(TestCase):
     """ Testing the Post Model """
-    def __init__(self) -> None:
-        super(PostTestCase, self).__init__()
+
+    def setUp(self) -> None:
         self.title = "Blog title example"
         self.content = "I'm just a blog content "
         self.category_name = "General"
         self.email = "author@example.com"
-
-    def setUp(self) -> None:
         self.author = self.create_author()
         self.category = self.create_category()
 
@@ -97,40 +97,49 @@ class PostTestCase(TestCase):
 
     def create_author(self, **kwargs) -> models.Author:
         """ Create a sample author """
-
-        user = get_user_model().objects.create_user(**kwargs)
-        author = models.Author.objects.create(user=user)
+        author_data = {f"{get_user_model().USERNAME_FIELD}": self.email}
+        author_data.update(kwargs)
+        user = get_user_model().objects.create_user(author_data)
+        author = models.Author.objects.create(
+            user=user, first_name="Test", last_name="User"
+        )
         return author
 
     @staticmethod
     def get_mock_image():
         from django.core.files.images import ImageFile
-        file = tempfile.NamedTemporaryFile(suffix='.png')
+
+        file = tempfile.NamedTemporaryFile(suffix=".png")
         return ImageFile(file, name=file.name)
 
     def create_category(self, **kwargs) -> models.Category:
         defaults = {"name": self.category_name}
         defaults.update(kwargs)
-        category = models.Category.objects.create(defaults)
+        category = models.Category.objects.create(**defaults)
         return category
 
     def test_post_creation_success_valid_details(self) -> None:
         """ Test post can be created when valid details are supplied """
         title = content = uuid.uuid4()
         post = models.Post.objects.create(
-            author=self.author, title=title, content=content, category=self.category, cover_image=self.get_mock_image()
+            author=self.author,
+            title=title,
+            content=content,
+            category=self.category,
+            cover_image=self.get_mock_image(),
         )
         author_and_categories_exist = models.Post.objects.filter(
             slug=post.slug, author=self.author, category=self.category
         ).exists()
-        post_exists = models.Post.objects.filter(author=self.author, title=title, content=content,
-                                          category=self.category).exists()
+        post_exists = models.Post.objects.filter(
+            author=self.author, title=title, content=content, category=self.category
+        ).exists()
         self.assertTrue(post_exists)
         self.assertTrue(post.cover_image)
         self.assertEqual(post.title, title)
         self.assertEqual(post.slug, slugify(title))
         self.assertTrue(author_and_categories_exist)
-        self.assertEqual(post.fileType, models.Post.HTML)
+        self.assertEqual(post.file_type, models.Post.HTML)
         self.assertEqual(post.status, models.Post.DRAFT)
         self.assertEqual(post.created_at, post.modified_at)
 
@@ -138,67 +147,66 @@ class PostTestCase(TestCase):
         """ Test post can be created when valid details are supplied but no author """
         title = content = uuid.uuid4()
         post = models.Post.objects.create(
-            title=title, content=content, category=self.create_category(),
+            title=title, content=content, category=self.category,
         )
-        categories_exist = models.Post.objects.filter(
-            slug=post.slug, category=self.category
+        post_exists = models.Post.objects.filter(
+            title=title, content=content, category=self.category
         ).exists()
-        post_exists = models.Post.objects.filter(author=self.author, title=title, content=content,
-                                          category=self.category).exists()
         self.assertTrue(post_exists)
         self.assertEqual(post.title, title)
         self.assertEqual(post.author, None)
         self.assertEqual(post.slug, slugify(title))
-        self.assertEqual(categories_exist, True)
-        self.assertEqual(post.fileType, models.Post.HTML)
+        self.assertEqual(post.file_type, models.Post.HTML)
         self.assertEqual(post.created_at, post.modified_at)
 
     def test_post_creation_success_no_category(self) -> None:
         """ Test post can be created when valid details are supplied but no category """
         title = content = uuid.uuid4()
-        post = models.Post.objects.create(author=self.author, title=title, content=content,)
-        author_exists = models.Post.objects.filter(
-            slug=post.slug, author=self.author
+        post = models.Post.objects.create(
+            author=self.author, title=title, content=content,
+        )
+        post_exists = models.Post.objects.filter(
+            author=self.author, title=title, content=content
         ).exists()
-        post_exists = models.Post.objects.filter(author=self.author, title=title, content=content,
-                                          category=self.category).exists()
         self.assertTrue(post_exists)
         self.assertEqual(post.title, title)
         self.assertEqual(post.slug, slugify(title))
-        self.assertEqual(author_exists, True)
-        self.assertEqual(post.fileType, models.Post.HTML)
+        self.assertEqual(post.file_type, models.Post.HTML)
         self.assertEqual(post.created_at, post.modified_at)
 
     def test_post_creation_success_no_cover_image(self) -> None:
         """ Test post can be created when valid details are supplied but no cover_image """
         title = content = uuid.uuid4()
         post = models.Post.objects.create(
-            title=title, content=content, category=self.create_category(), author=self.author
+            title=title, content=content, category=self.category, author=self.author
         )
-        categories_exist = models.Post.objects.filter(
-            slug=post.slug, category=self.category
+        post_exists = models.Post.objects.filter(
+            author=self.author, title=title, content=content, category=self.category
         ).exists()
-        post_exists = models.Post.objects.filter(author=self.author, title=title, content=content,
-                                          category=self.category).exists()
         self.assertTrue(post_exists)
         self.assertEqual(post.title, title)
-        self.assertEqual(post.cover_image, False)
-        self.assertEqual(post.author, None)
+        self.assertEqual(post.cover_image, None)
+        self.assertEqual(post.author, self.author)
         self.assertEqual(post.slug, slugify(title))
-        self.assertEqual(categories_exist, True)
-        self.assertEqual(post.fileType, models.Post.HTML)
+        self.assertEqual(post.file_type, models.Post.HTML)
         self.assertEqual(post.created_at, post.modified_at)
 
     def test_post_tags_addition_success(self) -> None:
         """ Test tag can be successfully created """
         title = content = uuid.uuid4()
         post = models.Post.objects.create(
-            author=self.author, title=title, content=content, category=self.category, cover_image=self.get_mock_image()
+            author=self.author,
+            title=title,
+            content=content,
+            category=self.category,
+            cover_image=self.get_mock_image(),
         )
         tag = models.Tag.objects.create(name="General")
         tag2 = models.Tag.objects.create(name="General2")
         post.tags.add(tag, tag2)
-        tags_exist = Tag.objects.filter(post=post, tag__id__in=[tag.id, tag2.id]).exists()
+        tags_exist = models.Post.objects.filter(
+            slug=post.slug, tags__slug__in=[tag.slug, tag2.slug]
+        ).exists()
         self.assertTrue(tags_exist)
         self.assertEqual(post.tags.count(), 2)
 
@@ -207,7 +215,7 @@ class PostTestCase(TestCase):
         with self.assertRaises(ValidationError):
             content = uuid.uuid4()
             models.Post.objects.create(
-                author=self.author,  content=content, category=self.category
+                author=self.author, content=content, category=self.category
             )
 
     def test_post_creation_fail_no_content(self) -> None:
@@ -220,6 +228,8 @@ class PostTestCase(TestCase):
 
     def test_post_marked_as_published(self) -> None:
         """ Test that post is marked as published after running publish method """
+        title = self.title
+        content = self.content
         post = models.Post.objects.create(
             author=self.author, title=title, content=content, category=self.category,
         )
@@ -227,45 +237,49 @@ class PostTestCase(TestCase):
 
         # Publish post
         post.mark_as_published()
+        post.refresh_from_db()
         self.assertEqual(post.status, models.Post.PUBLISHED)
 
     def test_post_marked_as_draft(self) -> None:
         """ Test that post is marked as draft after running draft method """
         post = models.Post.objects.create(
-            author=self.author, title=title, content=content, category=self.category, status=models.Post.PUBLISHED
+            author=self.author,
+            title=self.title,
+            content=self.content,
+            category=self.category,
+            status=models.Post.PUBLISHED,
         )
         self.assertEqual(post.status, models.Post.PUBLISHED)
 
         # Publish post
         post.mark_as_draft()
+        post.refresh_from_db()
         self.assertEqual(post.status, models.Post.DRAFT)
 
 
 class CategoryTestCase(TestCase):
     """ Testing the category model """
-    def __init__(self):
-        super(CategoryTestCase, self).__init__()
+
+    def setUp(self) -> None:
         self.name = "General"
 
     def test_category_creation_success(self) -> None:
         """ Test category can be created successfully """
-        models.Category.objects.create(
-            name=self.name
-        )
-        category_exists = models.Category.objects.filter(slug=slugify(self.name)).exists()
+        models.Category.objects.create(name=self.name)
+        category_exists = models.Category.objects.filter(
+            slug=slugify(self.name)
+        ).exists()
         self.assertTrue(category_exists)
 
 
 class TagTestCase(TestCase):
     """ Testing the tags model """
-    def __init__(self):
-        super(TagTestCase, self).__init__()
+
+    def setUp(self) -> None:
         self.name = "General-Small"
 
     def test_category_creation_success(self) -> None:
         """ Test tag can be created successfully """
-        models.Tag.objects.create(
-            name=self.name
-        )
+        models.Tag.objects.create(name=self.name)
         tag_exists = models.Tag.objects.filter(slug=slugify(self.name)).exists()
         self.assertTrue(tag_exists)
