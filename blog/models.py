@@ -23,12 +23,12 @@ def author_avatar_file_path(instance, filename):
 
 
 class Author(models.Model):
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     slug = models.SlugField(max_length=255, unique=True)
     avatar = models.ImageField(null=True, upload_to=author_avatar_file_path, blank=True)
     first_name = models.CharField(max_length=255)
     last_name = models.CharField(max_length=255)
-    description = models.TextField(max_length=255)
+    description = models.TextField(max_length=255, blank=True)
     created_at = models.DateTimeField()
     modified_at = models.DateTimeField()
 
