@@ -51,7 +51,7 @@ class AuthorPublicApi(TestCase):
             user=self.user, first_name="Aaron", last_name="Kazah"
         )
         response = self.client.put(self.author_detail_endpoint(author.slug), {})
-        self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_patch_authors_failure(self) -> None:
         """ Test patch request returns unauthorized for unauthenticated users """
@@ -67,7 +67,7 @@ class AuthorPublicApi(TestCase):
         response = self.client.delete(self.author_detail_endpoint(author.slug))
         author = Author.objects.filter(slug="ben-10")
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
-        self.assertEqual(author.exists(), False)
+        self.assertEqual(author.exists(), True)
 
 
 class AuthorPrivateApi(TestCase):
@@ -107,14 +107,14 @@ class AuthorPrivateApi(TestCase):
 
     def test_post_author_success(self) -> None:
         """ Test post request returns 200 for authenticated users """
-        payload = {"first_name": "Jack", "last_name": "Nichols", "user": self.user}
-        response = self.client.get(self.endpoint, data=payload)
+        payload = {"first_name": "Jack", "last_name": "awefwen", "user": self.user.id}
+        response = self.client.post(self.endpoint, data=payload)
         author = Author.objects.filter(**payload)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertTrue(author.exists())
-        self.assertEqual(author.first_name, payload["first_name"])
-        self.assertEqual(author.last_name, payload["last_name"])
-        self.assertEqual(author.user, payload["user"])
+        self.assertEqual(author.first().first_name, payload["first_name"])
+        self.assertEqual(author.first().last_name, payload["last_name"])
+        self.assertEqual(author.first().user.id, payload["user"])
 
     def test_put_author_fail(self) -> None:
         """ Test PUT request returns 405"""
@@ -124,7 +124,7 @@ class AuthorPrivateApi(TestCase):
         payload = {
             "last_name": "Burgers",
         }
-        response = self.client.patch(
+        response = self.client.put(
             self.author_detail_endpoint(author.slug), data=payload
         )
         self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
@@ -140,6 +140,7 @@ class AuthorPrivateApi(TestCase):
         response = self.client.patch(
             self.author_detail_endpoint(author.slug), data=payload
         )
+        author.refresh_from_db()
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(author.last_name, payload["last_name"])
 
@@ -152,7 +153,7 @@ class AuthorPrivateApi(TestCase):
         author = Author.objects.filter(
             user=self.user, first_name="Mary", last_name="Donalds"
         )
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertEqual(author.exists(), False)
 
 
@@ -194,7 +195,7 @@ class SocialAccountPublicAPi(TestCase):
         response = self.client.put(
             self.social_account_detail_endpoint(social_account.slug), {}
         )
-        self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_delete_social_accounts(self) -> None:
         """ Test delete request returns unauthorized """
@@ -245,8 +246,8 @@ class SocialAccountPrivateAPi(TestCase):
 
     def test_post_social_account_success(self) -> None:
         """ Test POST request returns 200 """
-        payload = {"name": "Google"}
-        response = self.client.get(self.endpoint, data=payload)
+        payload = {"name": "Google", "url": "google.com"}
+        response = self.client.post(self.endpoint, data=payload)
         google = SocialAccount.objects.filter(**payload)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertTrue(google.exists())
@@ -257,7 +258,7 @@ class SocialAccountPrivateAPi(TestCase):
         payload = {
             "name": "Google",
         }
-        response = self.client.patch(
+        response = self.client.put(
             self.social_account_detail_endpoint(twitter.slug), data=payload
         )
         self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
@@ -271,6 +272,7 @@ class SocialAccountPrivateAPi(TestCase):
         response = self.client.patch(
             self.social_account_detail_endpoint(twitter.slug), data=payload
         )
+        twitter.refresh_from_db()
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(twitter.name, payload["name"])
 
@@ -279,7 +281,7 @@ class SocialAccountPrivateAPi(TestCase):
         twitter = self._social_account(name="Twitter")
         response = self.client.delete(self.social_account_detail_endpoint(twitter.slug))
         social_account = SocialAccount.objects.filter(slug="twitter")
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertEqual(social_account.exists(), False)
 
 
@@ -317,7 +319,7 @@ class CategoryPublicApi(TestCase):
         """ Test put request returns method not allowed """
         category = Category.objects.create(name="Spongebob")
         response = self.client.put(self.category_endpoint(category.slug), {})
-        self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_delete_category_accounts(self) -> None:
         """ Test delete request returns unauthorized """
@@ -360,10 +362,10 @@ class CategoryPrivateApi(TestCase):
         response = self.client.get(self.endpoint)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-    def test_post_category(self) -> None:
+    def test_post_category_success(self) -> None:
         """ Test POST request returns 200 """
         payload = {"name": "Pink"}
-        response = self.client.get(self.endpoint, data=payload)
+        response = self.client.post(self.endpoint, data=payload)
         category = Category.objects.filter(**payload)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertTrue(category.exists())
@@ -374,9 +376,7 @@ class CategoryPrivateApi(TestCase):
         payload = {
             "name": "Red",
         }
-        response = self.client.patch(
-            self.category_endpoint(category.slug), data=payload
-        )
+        response = self.client.put(self.category_endpoint(category.slug), data=payload)
         self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
 
     def test_patch_category_success(self) -> None:
@@ -388,6 +388,7 @@ class CategoryPrivateApi(TestCase):
         response = self.client.patch(
             self.category_endpoint(category.slug), data=payload
         )
+        category.refresh_from_db()
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(category.name, payload["name"])
 
@@ -396,7 +397,7 @@ class CategoryPrivateApi(TestCase):
         category = self._category(name="Twitter")
         response = self.client.delete(self.category_endpoint(category.slug))
         category = Category.objects.filter(slug="twitter")
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertEqual(category.exists(), False)
 
 
@@ -433,7 +434,7 @@ class TagPublicApi(TestCase):
         """ Test put request returns method not allowed """
         tag = Tag.objects.create(name="tag")
         response = self.client.put(self.tag_endpoint(tag.slug), {})
-        self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_delete_tags_accounts(self) -> None:
         """ Test delete request returns unauthorized """
@@ -479,7 +480,7 @@ class TagPrivateApi(TestCase):
     def test_post_tag_success(self) -> None:
         """ Test POST request returns 200 """
         payload = {"name": "B2B"}
-        response = self.client.get(self.endpoint, data=payload)
+        response = self.client.post(self.endpoint, data=payload)
         tag = Tag.objects.filter(**payload)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertTrue(tag.exists())
@@ -490,7 +491,7 @@ class TagPrivateApi(TestCase):
         payload = {
             "name": "Red",
         }
-        response = self.client.patch(self.tag_endpoint(tag.slug), data=payload)
+        response = self.client.put(self.tag_endpoint(tag.slug), data=payload)
         self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
 
     def test_patch_tag_success(self) -> None:
@@ -500,6 +501,7 @@ class TagPrivateApi(TestCase):
             "name": "Blue",
         }
         response = self.client.patch(self.tag_endpoint(tag.slug), data=payload)
+        tag.refresh_from_db()
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(tag.name, payload["name"])
 
@@ -508,7 +510,7 @@ class TagPrivateApi(TestCase):
         tag = self._create_tag(name="twitter")
         response = self.client.delete(self.tag_endpoint(tag.slug))
         tag = Tag.objects.filter(slug="twitter")
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertEqual(tag.exists(), False)
 
 
@@ -549,7 +551,7 @@ class PostPublicApi(TestCase):
         """ Test put request returns unauthorized for unauthenticated users """
         post = self._create_post(title="Test Title", content="Test content")
         response = self.client.put(self.post_detail_endpoint(post.slug), {})
-        self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_patch_blog_post_failure(self) -> None:
         """ Test patch request returns unauthorized for unauthenticated users """
@@ -565,7 +567,7 @@ class PostPublicApi(TestCase):
         response = self.client.delete(self.post_detail_endpoint(post.slug), {})
         post = Post.objects.filter(slug="test-title")
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
-        self.assertEqual(post.exists(), False)
+        self.assertEqual(post.exists(), True)
 
 
 class PostPrivateAPI(TestCase):
@@ -577,7 +579,7 @@ class PostPrivateAPI(TestCase):
         self.last_name = "Test"
         self.email = "test@example.com"
         self.password = "password123..."
-        self.endpoint = reverse("blog:author-list")
+        self.endpoint = reverse("blog:post-list")
         self.client = APIClient()
         user_data = {
             f"{get_user_model().USERNAME_FIELD}": self.email,
@@ -594,9 +596,9 @@ class PostPrivateAPI(TestCase):
         return Post.objects.create(**kwargs)
 
     @staticmethod
-    def detail_endpoint(author_slug: str) -> None:
+    def detail_endpoint(slug: str) -> None:
         """ Return author detail url """
-        return reverse("blog:post-detail", args=[author_slug])
+        return reverse("blog:post-detail", args=[slug])
 
     def test_get_blog_post_success(self) -> None:
         """ Test get request returns 200 for unauthenticated users """
@@ -607,8 +609,8 @@ class PostPrivateAPI(TestCase):
         """ Test post request returns unauthorized for unauthenticated users """
         payload = {"title": "Test title", "content": "Test description"}
         response = self.client.post(self.endpoint, payload)
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(Post.objects.count(), 0)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(Post.objects.count(), 1)
 
     def test_put_blog_post_fail(self) -> None:
         """ Test put request returns unauthorized for unauthenticated users """
@@ -629,16 +631,18 @@ class PostPrivateAPI(TestCase):
         post = self._create_post(title="Test Title", content="Test content")
         payload = {"tags": ["banana", "apple", "sugar"]}
         response = self.client.patch(self.detail_endpoint(post.slug), payload)
+        post.refresh_from_db()
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(post.tags.count(), len(payload["tags"]))
         self.assertTrue(post.tags.filter(slug__in=payload["tags"]).exists())
 
     def test_patch_blog_post_tags_removal(self) -> None:
         """ Test that tags are successfully removed """
-        post = self._create_post(title="Test Title", content="Test content")
-        payload = {"tags": [""]}
+        post = self._create_post(title="Test tTitle", content="Test content")
+        payload = {"tags": []}
         response = self.client.patch(self.detail_endpoint(post.slug), payload)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+        post.refresh_from_db()
         self.assertEqual(post.tags.count(), 0)
         self.assertFalse(post.tags.filter(slug__in=payload["tags"]).exists())
 
@@ -647,5 +651,5 @@ class PostPrivateAPI(TestCase):
         post = self._create_post(title="Test Title", content="Test content")
         response = self.client.delete(self.detail_endpoint(post.slug), {})
         post = Post.objects.filter(slug="test-title")
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertEqual(post.exists(), False)

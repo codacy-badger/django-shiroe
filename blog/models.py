@@ -46,7 +46,7 @@ class Author(models.Model):
         if not self.user:
             raise ValidationError("User is required")
         try:
-            int(self.full_name.replace(" ", ""))
+            int(self.name.replace(" ", ""))
             raise ValidationError("Only enter valid names")
         except ValueError:
             pass
@@ -54,7 +54,7 @@ class Author(models.Model):
         super().save()
 
     def _get_unique_slug(self):
-        slug = slugify(self.full_name)
+        slug = slugify(self.name)
         unique_slug = slug
         num = 1
         while Author.objects.filter(slug=unique_slug).exists():
@@ -63,11 +63,11 @@ class Author(models.Model):
         return unique_slug
 
     @property
-    def full_name(self):
+    def name(self):
         return f"{self.first_name} {self.last_name}"
 
     def __str__(self):
-        return self.full_name
+        return self.name
 
 
 class SocialAccount(models.Model):
@@ -93,21 +93,17 @@ class SocialAccount(models.Model):
 
 class Post(models.Model):
     author = models.ForeignKey(
-        "blog.Author",
-        null=True,
-        on_delete=models.SET_NULL,
-        blank=True
+        "blog.Author", null=True, on_delete=models.SET_NULL, blank=True
     )
-    cover_image = models.ImageField(null=True, upload_to=post_image_file_path, blank=True)
+    cover_image = models.ImageField(
+        null=True, upload_to=post_image_file_path, blank=True
+    )
     title = models.CharField(max_length=255)
     slug = models.SlugField(max_length=255, unique=True, blank=True)
     content = models.TextField()
     summary = models.TextField(max_length=500, blank=True)
     category = models.ForeignKey(
-        "blog.Category",
-        null=True,
-        on_delete=models.SET_NULL,
-        blank=True
+        "blog.Category", null=True, on_delete=models.SET_NULL, blank=True
     )
     tags = models.ManyToManyField("blog.Tag", related_name="tags", blank=True)
     DRAFT = "Draft"
@@ -119,10 +115,7 @@ class Post(models.Model):
     status = models.CharField(max_length=25, choices=POST_STATUS_CHOICES, default=DRAFT)
     HTML = "HTML"
     MARKDOWN = "MARKDOWN"
-    FILE_TYPE_CHOICES = (
-        (HTML, "HTML"),
-        (MARKDOWN, "MARKDOWN")
-    )
+    FILE_TYPE_CHOICES = ((HTML, "HTML"), (MARKDOWN, "MARKDOWN"))
     file_type = models.CharField(max_length=25, choices=FILE_TYPE_CHOICES, default=HTML)
     created_at = models.DateTimeField()
     modified_at = models.DateTimeField()

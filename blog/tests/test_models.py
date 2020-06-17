@@ -17,7 +17,10 @@ class AuthorTestCase(TestCase):
         self.first_name = "Test"
         self.last_name = "User"
         self.email = "test@example.com"
-        user_data = {f"{get_user_model().USERNAME_FIELD}": self.email}
+        user_data = {
+            f"{get_user_model().USERNAME_FIELD}": self.email,
+            "password": "12345678uhgvb",
+        }
         self.user = get_user_model().objects.create_user(**user_data)
         self.mock_image = self.get_mock_image()
 
@@ -97,9 +100,12 @@ class PostTestCase(TestCase):
 
     def create_author(self, **kwargs) -> models.Author:
         """ Create a sample author """
-        author_data = {f"{get_user_model().USERNAME_FIELD}": self.email}
+        author_data = {
+            f"{get_user_model().USERNAME_FIELD}": self.email,
+            "password": "1239i9rg",
+        }
         author_data.update(kwargs)
-        user = get_user_model().objects.create_user(author_data)
+        user = get_user_model().objects.create_user(**author_data)
         author = models.Author.objects.create(
             user=user, first_name="Test", last_name="User"
         )
